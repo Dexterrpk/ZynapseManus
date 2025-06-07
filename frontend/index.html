@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Zynapse</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="/frontend/assets/css/whatsapp-dashboard.css">
+    <style>
+        [x-cloak] { display: none !important; }
+        .sidebar-link {
+            @apply text-indigo-100 hover:bg-indigo-600 group flex items-center px-2 py-2 text-sm font-medium rounded-md;
+        }
+        .sidebar-link-active {
+            @apply bg-indigo-800 text-white group flex items-center px-2 py-2 text-sm font-medium rounded-md;
+        }
+        .sidebar-link-mobile {
+             @apply text-indigo-100 hover:bg-indigo-600 group flex items-center px-2 py-2 text-base font-medium rounded-md;
+        }
+        .sidebar-link-mobile-active {
+             @apply bg-indigo-800 text-white group flex items-center px-2 py-2 text-base font-medium rounded-md;
+        }
+        .logs-container {
+            background-color: #1f2937; /* bg-gray-800 */
+            color: #f3f4f6; /* text-gray-100 */
+            padding: 1rem;
+            border-radius: 0.375rem; /* rounded-md */
+            height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.875rem; /* text-sm */
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div x-data="{
+            sidebarOpen: false,
+            user: { name: 'Carregando...', email: '', logo: null, is_superuser: false },
+            token: null,
+            activeSection: 'dashboard', // Controla a seção ativa
+            fetchUserData() {
+                this.token = localStorage.getItem('zynapse_token');
+                if (!this.token) {
+                    window.location.href = '/frontend/login.html';
+                    return;
+                }
+                fetch('/api/v1/users/me', {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                })
+                .then(response => {
+                    if (response.status === 401) {
+                        this.logout();
+                        throw new Error('Não autorizado');
+                    }
+                    if (!response.ok) {
+                        throw new Error('Falha ao buscar dados do usuário');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    this.user.name = data.full_name || 'Usuário';
+                    this.user.email = data.email;
+                    this.user.logo = data.custom_logo_url;
+                    this.user.is_superuser = data.is_superuser;
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    if (error.message !== 'Não autorizado') {
+                       // this.logout(); 
+                    }
+                });
+            },
+            logout() {
+                localStorage.removeItem('zynapse_token');
+                window.location.href = '/frontend/login.html';
+            }
+        }" x-init="fetchUserData()">
+        
+        <!-- Overlay for mobile sidebar -->
+        <div x-show="sidebarOpen" class="fixed inset-0 flex z-40 md:hidden" x-cloak>
+            <div @click="sidebarOpen = false" class="fixed inset-0 bg-gray-600 bg-opacity-75" aria-hidden="true"></div>
+            <div class="relative flex-1 flex flex-col max-w-xs w-full bg-indigo-700">
+                <div class="absolute top-0 right-0 -mr-12 pt-2">
+                    <button type="button" @click="sidebarOpen = false" class="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white">
+                        <span class="sr-only">Fechar sidebar</span>
+                        <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
+                    <div class="flex-shrink-0 flex items-center px-4">
+                        <img class="h-8 w-auto" :src="user.logo || /backend/assets/img/logo.png')" alt="Zynapse Logo">
+                    </div>
+                    <nav class="mt-5 px-2 space-y-1">
+                        <a href="#" @click.prevent="activeSection = 'dashboard'; sidebarOpen = false" :class="activeSection === 'dashboard' ? 'sidebar-link-mobile-active' : 'sidebar-link-mobile'">
+                            Dashboard
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'whatsapp'; sidebarOpen = false" :class="activeSection === 'whatsapp' ? 'sidebar-link-mobile-active' : 'sidebar-link-mobile'">
+                            WhatsApp
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'bot_control'; sidebarOpen = false" :class="activeSection === 'bot_control' ? 'sidebar-link-mobile-active' : 'sidebar-link-mobile'">
+                            Controle do Bot
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'campaigns'; sidebarOpen = false" :class="activeSection === 'campaigns' ? 'sidebar-link-mobile-active' : 'sidebar-link-mobile'">
+                            Campanhas
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'ai_training'; sidebarOpen = false" :class="activeSection === 'ai_training' ? 'sidebar-link-mobile-active' : 'sidebar-link-mobile'">
+                            Treinamento IA
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'settings'; sidebarOpen = false" :class="activeSection === 'settings' ? 'sidebar-link-mobile-active' : 'sidebar-link-mobile'">
+                            Configurações
+                        </a>
+                        <template x-if="user.is_superuser">
+                             <a href="#" @click.prevent="activeSection = 'admin'; sidebarOpen = false" :class="activeSection === 'admin' ? 'sidebar-link-mobile-active' : 'sidebar-link-mobile'">
+                                Admin
+                            </a>
+                        </template>
+                    </nav>
+                </div>
+                <div class="flex-shrink-0 flex border-t border-indigo-800 p-4">
+                    <a href="#" @click.prevent="logout()" class="flex-shrink-0 group block">
+                        <div class="flex items-center">
+                            <div>
+                                <span class="inline-block h-10 w-10 rounded-full overflow-hidden bg-gray-100">
+                                    <svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-base font-medium text-white" x-text="user.name"></p>
+                                <p class="text-sm font-medium text-indigo-200 group-hover:text-white">Sair</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+            <div class="flex-shrink-0 w-14" aria-hidden="true"></div>
+        </div>
+
+        <!-- Static sidebar for desktop -->
+        <div class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
+            <div class="flex flex-col flex-grow pt-5 bg-indigo-700 overflow-y-auto">
+                <div class="flex items-center flex-shrink-0 px-4">
+                     <img class="h-8 w-auto" :src="user.logo || 'https://tailwindui.com/img/logos/workflow-logo-indigo-300-mark-white-text.svg'" alt="Zynapse Logo">
+                </div>
+                <div class="mt-5 flex-1 flex flex-col">
+                    <nav class="flex-1 px-2 pb-4 space-y-1">
+                         <a href="#" @click.prevent="activeSection = 'dashboard'" :class="activeSection === 'dashboard' ? 'sidebar-link-active' : 'sidebar-link'">
+                            Dashboard
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'whatsapp'" :class="activeSection === 'whatsapp' ? 'sidebar-link-active' : 'sidebar-link'">
+                            WhatsApp
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'bot_control'" :class="activeSection === 'bot_control' ? 'sidebar-link-active' : 'sidebar-link'">
+                            Controle do Bot
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'campaigns'" :class="activeSection === 'campaigns' ? 'sidebar-link-active' : 'sidebar-link'">
+                            Campanhas
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'ai_training'" :class="activeSection === 'ai_training' ? 'sidebar-link-active' : 'sidebar-link'">
+                            Treinamento IA
+                        </a>
+                        <a href="#" @click.prevent="activeSection = 'settings'" :class="activeSection === 'settings' ? 'sidebar-link-active' : 'sidebar-link'">
+                            Configurações
+                        </a>
+                        <template x-if="user.is_superuser">
+                             <a href="#" @click.prevent="activeSection = 'admin'" :class="activeSection === 'admin' ? 'sidebar-link-active' : 'sidebar-link'">
+                                Admin
+                            </a>
+                        </template>
+                    </nav>
+                </div>
+                 <div class="flex-shrink-0 flex border-t border-indigo-800 p-4">
+                    <a href="#" @click.prevent="logout()" class="flex-shrink-0 w-full group block">
+                        <div class="flex items-center">
+                            <div>
+                                <span class="inline-block h-9 w-9 rounded-full overflow-hidden bg-gray-100">
+                                    <svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" />
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-white" x-text="user.name"></p>
+                                <p class="text-xs font-medium text-indigo-200 group-hover:text-white">Sair</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="md:pl-64 flex flex-col flex-1">
+            <div class="sticky top-0 z-10 md:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-gray-100">
+                <button type="button" @click="sidebarOpen = true" class="-ml-0.5 -mt-0.5 h-12 w-12 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500">
+                    <span class="sr-only">Abrir sidebar</span>
+                    <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            </div>
+            <main class="flex-1">
+                <div class="py-6">
+                    <!-- Seção Dashboard -->
+                    <div x-show="activeSection === 'dashboard'" x-cloak>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <h1 class="text-2xl font-semibold text-gray-900">Dashboard</h1>
+                        </div>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <div class="py-4">
+                                <div class="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
+                                    <p class="text-gray-700">Bem-vindo ao seu painel Zynapse, <span x-text="user.name"></span>!</p>
+                                    <p class="text-gray-600 text-sm mt-2">Email: <span x-text="user.email"></span></p>
+                                    <template x-if="user.is_superuser">
+                                        <p class="mt-4 p-2 bg-yellow-100 text-yellow-800 rounded">Você tem permissões de administrador.</p>
+                                    </template>
+                                    <!-- Conteúdo específico do Dashboard -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção WhatsApp -->
+                    <div x-show="activeSection === 'whatsapp'" x-data="whatsappDashboard" x-cloak>
+                        <!-- Conteúdo da seção WhatsApp (já implementado) -->
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <h1 class="text-2xl font-semibold text-gray-900">WhatsApp</h1>
+                        </div>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <div class="py-4">
+                                <div class="bg-white shadow rounded-lg">
+                                    <!-- Mensagem de erro -->
+                                    <div x-show="error" class="error-message" x-text="error"></div>
+                                    
+                                    <!-- Interface de chat -->
+                                    <div class="flex h-[600px]
+                                        <!-- Lista de conversas -->
+                                        <div class="w-1/3 border-r border-gray-200 conversation-list">
+                                            <div class="p-4 border-b border-gray-200 bg-gray-50">
+                                                <h2 class="text-lg font-medium text-gray-900">Conversas</h2>
+                                            </div>
+                                            
+                                            <!-- Loading -->
+                                            <div x-show="loading && !conversations.length" class="flex justify-center items-center h-full">
+                                                <svg class="animate-spin h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            </div>
+                                            
+                                            <!-- Lista vazia -->
+                                            <div x-show="!loading && !conversations.length" class="empty-state">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                </svg>
+                                                <p>Nenhuma conversa encontrada</p>
+                                            </div>
+                                            
+                                            <!-- Lista de conversas -->
+                                            <template x-for="conversation in conversations" :key="conversation.phone">
+                                                <div 
+                                                    @click="selectConversation(conversation.phone)" 
+                                                    :class="{'conversation-item': true, 'active': selectedConversation === conversation.phone}'
+                                                >
+                                                    <div class="flex justify-between">
+                                                        <h3 class="text-sm font-medium text-gray-900" x-text="conversation.name"></h3>
+                                                        <span class="text-xs text-gray-500" x-text="formatDate(conversation.timestamp)"></span>
+                                                    </div>
+                                                    <p class="text-sm text-gray-500 truncate" x-text="conversation.last_message"></p>
+                                                    <div x-show="conversation.unread > 0" class="mt-1">
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                                            <span x-text="conversation.unread"></span> não lida(s)
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        
+                                        <!-- Área de mensagens -->
+                                        <div class="w-2/3 flex flex-col">
+                                            <!-- Cabeçalho da conversa -->
+                                            <div x-show="selectedConversation" class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                                                <h2 class="text-lg font-medium text-gray-900" x-text="selectedConversation ? (conversations.find(c => c.phone === selectedConversation)?.name || 'Contato') : ''"></h2>
+                                                <button 
+                                                    @click="clearConversation()" 
+                                                    class="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                >
+                                                    Limpar histórico
+                                                </button>
+                                            </div>
+                                            
+                                            <!-- Nenhuma conversa selecionada -->
+                                            <div x-show="!selectedConversation" class="flex-1 flex items-center justify-center bg-gray-50">
+                                                <div class="text-center">
+                                                    <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                                    </svg>
+                                                    <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhuma conversa selecionada</h3>
+                                                    <p class="mt-1 text-sm text-gray-500">Selecione uma conversa para ver as mensagens.</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Loading -->
+                                            <div x-show="selectedConversation && loading" class="flex-1 flex justify-center items-center">
+                                                <svg class="animate-spin h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            </div>
+                                            
+                                            <!-- Mensagens -->
+                                            <div 
+                                                x-show="selectedConversation && !loading" 
+                                                class="flex-1 chat-container"
+                                                x-ref="chatContainer"
+                                            >
+                                                <template x-for="(message, index) in messages" :key="index">
+                                                    <div :class="{'message': true, 'message-user': message.role === 'user', 'message-assistant': message.role === 'assistant'}'">
+                                                        <div x-text="message.content"></div>
+                                                        <div class="message-time" x-text="formatDate(message.timestamp)"></div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                            
+                                            <!-- Input de mensagem -->
+                                            <div x-show="selectedConversation" class="message-input">
+                                                <form @submit.prevent="sendMessage">
+                                                    <div class="flex rounded-md shadow-sm">
+                                                        <input 
+                                                            type="text" 
+                                                            x-model="newMessage" 
+                                                            class="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-none rounded-l-md sm:text-sm border-gray-300" 
+                                                            placeholder="Digite sua mensagem..."
+                                                        >
+                                                        <button 
+                                                            type="submit" 
+                                                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                                        >
+                                                            Enviar
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção Controle do Bot -->
+                    <div x-show="activeSection === 'bot_control'" x-data="botControl" x-cloak>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <h1 class="text-2xl font-semibold text-gray-900">Controle do Bot WhatsApp</h1>
+                        </div>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <div class="py-4">
+                                <div class="bg-white shadow rounded-lg p-6">
+                                    <!-- Mensagem de erro/sucesso -->
+                                    <div x-show="message" :class="{'p-4 mb-4 text-sm rounded-lg': true, 'bg-red-100 text-red-700': messageType === 'error', 'bg-green-100 text-green-700': messageType === 'success'}" x-text="message"></div>
+
+                                    <!-- Status e Controles -->
+                                    <div class="flex items-center justify-between mb-6">
+                                        <div>
+                                            <h2 class="text-lg font-medium text-gray-900">Status do Bot</h2>
+                                            <div class="mt-1 flex items-center space-x-2">
+                                                <span :class="{'inline-block h-3 w-3 rounded-full': true, 'bg-green-500': botStatus === 'running', 'bg-red-500': botStatus === 'stopped', 'bg-yellow-500': botStatus === 'loading' || botStatus === 'error'}'"></span>
+                                                <span class="text-sm font-medium" x-text="statusText"></span>
+                                                <span x-show="botPid" class="text-xs text-gray-500" x-text="'(PID: ' + botPid + ')'"></span>
+                                            </div>
+                                        </div>
+                                        <div class="flex space-x-3">
+                                            <button 
+                                                @click="startBot()"
+                                                :disabled="botStatus === 'running' || botStatus === 'loading'"
+                                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Iniciar Bot
+                                            </button>
+                                            <button 
+                                                @click="stopBot()"
+                                                :disabled="botStatus === 'stopped' || botStatus === 'loading'"
+                                                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Parar Bot
+                                            </button>
+                                            <button 
+                                                @click="fetchBotStatus()"
+                                                :disabled="botStatus === 'loading'"
+                                                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                                            >
+                                                Atualizar Status
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Logs -->
+                                    <div>
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h2 class="text-lg font-medium text-gray-900">Logs do Bot</h2>
+                                            <button 
+                                                @click="fetchBotLogs()"
+                                                :disabled="logLoading"
+                                                class="inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                                            >
+                                                <svg x-show="logLoading" class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span x-text="logLoading ? 'Carregando...' : 'Atualizar Logs'"></span>
+                                            </button>
+                                        </div>
+                                        <div class="logs-container">
+                                            <pre x-text="botLogs || 'Nenhum log disponível.'"></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção Campanhas -->
+                    <div x-show="activeSection === 'campaigns'" x-cloak>
+                        <!-- Conteúdo da seção Campanhas -->
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <h1 class="text-2xl font-semibold text-gray-900">Campanhas</h1>
+                        </div>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <div class="py-4">
+                                <div class="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
+                                    <p class="text-gray-500">Gerenciamento de campanhas (conteúdo a ser implementado).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção Treinamento IA -->
+                    <div x-show="activeSection === 'ai_training'" x-data="aiTraining" x-cloak>
+                        <!-- Conteúdo da seção Treinamento IA (já implementado) -->
+                         <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <h1 class="text-2xl font-semibold text-gray-900">Treinamento IA</h1>
+                        </div>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <div class="py-4">
+                                <div class="bg-white shadow rounded-lg training-container">
+                                    <!-- Mensagem de erro -->
+                                    <div x-show="error" class="error-message" x-text="error"></div>
+                                    
+                                    <!-- Mensagem de sucesso -->
+                                    <div x-show="success" class="bg-green-100 text-green-800 p-3 rounded-md mb-4" x-text="success"></div>
+                                    
+                                    <!-- Loading -->
+                                    <div x-show="loading" class="flex justify-center items-center py-4">
+                                        <svg class="animate-spin h-8 w-8 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </div>
+                                    
+                                    <div x-show="!loading">
+                                        <h2 class="text-lg font-medium text-gray-900 mb-4">Personalização da IA</h2>
+                                        
+                                        <div class="mb-6">
+                                            <label for="customPrompt" class="block text-sm font-medium text-gray-700 mb-1">Prompt da IA</label>
+                                            <textarea 
+                                                id="customPrompt" 
+                                                x-model="customPrompt" 
+                                                class="prompt-textarea shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                                                placeholder="Defina a personalidade e comportamento da IA..."
+                                            ></textarea>
+                                            <p class="mt-1 text-sm text-gray-500">Este prompt define como a IA se comportará ao responder mensagens no WhatsApp.</p>
+                                            
+                                            <div class="mt-3 flex space-x-3">
+                                                <button 
+                                                    @click="updateAIPrompt()"
+                                                    :disabled="loading"
+                                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                                                >
+                                                    Salvar Prompt
+                                                </button>
+                                                <button 
+                                                    @click="resetAIPrompt()"
+                                                    :disabled="loading"
+                                                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                                                >
+                                                    Restaurar Padrão
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="border-t border-gray-200 pt-6">
+                                            <h3 class="text-lg font-medium text-gray-900 mb-4">Parâmetros Avançados</h3>
+                                            
+                                            <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+                                                <div>
+                                                    <label for="temperature" class="block text-sm font-medium text-gray-700">Temperatura</label>
+                                                    <div class="mt-1 flex rounded-md shadow-sm">
+                                                        <input 
+                                                            type="number" 
+                                                            id="temperature" 
+                                                            x-model="temperature" 
+                                                            min="0" 
+                                                            max="1" 
+                                                            step="0.1" 
+                                                            class="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-md sm:text-sm border-gray-300"
+                                                        >
+                                                    </div>
+                                                    <p class="mt-1 text-xs text-gray-500">Valores mais altos (próximos de 1) geram respostas mais criativas e diversas. Valores mais baixos (próximos de 0) geram respostas mais previsíveis e focadas.</p>
+                                                </div>
+                                                
+                                                <div>
+                                                    <label for="maxTokens" class="block text-sm font-medium text-gray-700">Máximo de Tokens</label>
+                                                    <div class="mt-1 flex rounded-md shadow-sm">
+                                                        <input 
+                                                            type="number" 
+                                                            id="maxTokens" 
+                                                            x-model="maxTokens" 
+                                                            min="50" 
+                                                            max="500" 
+                                                            step="10" 
+                                                            class="focus:ring-indigo-500 focus:border-indigo-500 flex-1 block w-full rounded-md sm:text-sm border-gray-300"
+                                                        >
+                                                    </div>
+                                                    <p class="mt-1 text-xs text-gray-500">Limite máximo de tokens (palavras/caracteres) que a IA pode gerar em cada resposta. Valores entre 50 e 500.</p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="mt-4">
+                                                <button 
+                                                    @click="updateAIParameters()"
+                                                    :disabled="loading"
+                                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                                                >
+                                                    Salvar Parâmetros
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção Configurações -->
+                    <div x-show="activeSection === 'settings'" x-cloak>
+                        <!-- Conteúdo da seção Configurações -->
+                         <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <h1 class="text-2xl font-semibold text-gray-900">Configurações</h1>
+                        </div>
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                            <div class="py-4">
+                                <div class="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
+                                    <p class="text-gray-500">Configurações da conta e do sistema (conteúdo a ser implementado).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção Admin (Condicional) -->
+                    <template x-if="user.is_superuser">
+                        <div x-show="activeSection === 'admin'" x-cloak>
+                            <!-- Conteúdo da seção Admin -->
+                             <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                                <h1 class="text-2xl font-semibold text-gray-900">Administração</h1>
+                            </div>
+                            <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                                <div class="py-4">
+                                    <div class="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
+                                        <p class="text-gray-500">Painel de administração (gerenciar usuários, planos, etc. - conteúdo a ser implementado).</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="/frontend/assets/js/whatsapp-dashboard.js"></script>
+    <script>
+        // Alpine.js data for AI Training section
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('aiTraining', () => ({
+                customPrompt: '',
+                defaultPrompt: 'Você é um assistente virtual da Zynapse, uma empresa de automação comercial. Seja cordial, profissional e conciso. Limite suas respostas a 3-4 frases no máximo. Ofereça ajuda sobre produtos de automação comercial, atendimento ao cliente e agendamento de demonstrações.',
+                temperature: 0.7,
+                maxTokens: 150,
+                loading: false,
+                error: null,
+                success: null,
+                
+                init() {
+                    this.fetchAIConfig();
+                },
+                
+                fetchAIConfig() {
+                    this.loading = true;
+                    const token = localStorage.getItem('zynapse_token');
+                    if (!token) {
+                        this.error = 'Não autorizado. Faça login novamente.';
+                        this.loading = false;
+                        return;
+                    }
+                    
+                    fetch('/api/v1/ai/config', { headers: { 'Authorization': `Bearer ${token}` } })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Falha ao buscar configuração da IA');
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.customPrompt = data.prompt || this.defaultPrompt;
+                        this.temperature = data.temperature || 0.7;
+                        this.maxTokens = data.max_tokens || 150;
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar config da IA:', error);
+                        this.error = 'Erro ao carregar config da IA. Usando valores padrão.';
+                        this.customPrompt = this.defaultPrompt;
+                        this.temperature = 0.7;
+                        this.maxTokens = 150;
+                        this.loading = false;
+                    });
+                },
+                
+                updateAIPrompt() {
+                    if (!this.customPrompt.trim()) {
+                        this.error = 'O prompt não pode estar vazio.'; return;
+                    }
+                    this.loading = true; this.error = null; this.success = null;
+                    const token = localStorage.getItem('zynapse_token');
+                    if (!token) { this.error = 'Não autorizado.'; this.loading = false; return; }
+                    
+                    fetch('/api/v1/ai/prompt', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ prompt: this.customPrompt })
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Falha ao atualizar prompt');
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.success = 'Prompt da IA atualizado com sucesso!';
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Erro ao atualizar prompt:', error);
+                        this.error = 'Erro ao atualizar prompt. Tente novamente.';
+                        this.loading = false;
+                    });
+                },
+                
+                updateAIParameters() {
+                    if (this.temperature < 0 || this.temperature > 1) { this.error = 'Temperatura inválida.'; return; }
+                    if (this.maxTokens < 50 || this.maxTokens > 500) { this.error = 'Máximo de Tokens inválido.'; return; }
+                    
+                    this.loading = true; this.error = null; this.success = null;
+                    const token = localStorage.getItem('zynapse_token');
+                    if (!token) { this.error = 'Não autorizado.'; this.loading = false; return; }
+                    
+                    fetch('/api/v1/ai/parameters', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ temperature: parseFloat(this.temperature), max_tokens: parseInt(this.maxTokens) })
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Falha ao atualizar parâmetros');
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.success = 'Parâmetros da IA atualizados com sucesso!';
+                        this.loading = false;
+                    })
+                    .catch(error => {
+                        console.error('Erro ao atualizar parâmetros:', error);
+                        this.error = 'Erro ao atualizar parâmetros. Tente novamente.';
+                        this.loading = false;
+                    });
+                },
+                
+                resetAIPrompt() {
+                    this.customPrompt = this.defaultPrompt;
+                }
+            }));
+
+            // Alpine.js data for Bot Control section
+            Alpine.data('botControl', () => ({
+                botStatus: 'loading', // stopped, running, loading, error
+                botPid: null,
+                botLogs: '',
+                message: null,
+                messageType: 'info', // info, success, error
+                statusInterval: null,
+                logLoading: false,
+
+                get statusText() {
+                    switch (this.botStatus) {
+                        case 'running': return 'Rodando';
+                        case 'stopped': return 'Parado';
+                        case 'loading': return 'Carregando...';
+                        case 'error': return 'Erro';
+                        default: return 'Desconhecido';
+                    }
+                },
+
+                init() {
+                    this.fetchBotStatus();
+                    this.fetchBotLogs();
+                    // Refresh status every 15 seconds
+                    this.statusInterval = setInterval(() => this.fetchBotStatus(), 15000);
+                },
+
+                destroy() {
+                    if (this.statusInterval) {
+                        clearInterval(this.statusInterval);
+                    }
+                },
+
+                showMessage(text, type = 'info', duration = 5000) {
+                    this.message = text;
+                    this.messageType = type;
+                    setTimeout(() => { this.message = null; }, duration);
+                },
+
+                fetchBotStatus() {
+                    this.botStatus = 'loading';
+                    const token = localStorage.getItem('zynapse_token');
+                    if (!token) { this.showMessage('Não autorizado.', 'error'); this.botStatus = 'error'; return; }
+
+                    fetch('/api/v1/bot/status', { headers: { 'Authorization': `Bearer ${token}` } })
+                    .then(response => {
+                        if (!response.ok) throw new Error(`Falha ao buscar status: ${response.statusText}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.botStatus = data.status;
+                        this.botPid = data.pid;
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar status do bot:', error);
+                        this.showMessage('Erro ao buscar status do bot.', 'error');
+                        this.botStatus = 'error';
+                        this.botPid = null;
+                    });
+                },
+
+                startBot() {
+                    this.botStatus = 'loading';
+                    this.message = null;
+                    const token = localStorage.getItem('zynapse_token');
+                    if (!token) { this.showMessage('Não autorizado.', 'error'); this.botStatus = 'error'; return; }
+
+                    fetch('/api/v1/bot/start', { 
+                        method: 'POST', 
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                             return response.json().then(err => { throw new Error(err.detail || 'Falha ao iniciar o bot'); });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.botStatus = data.status;
+                        this.botPid = data.pid;
+                        this.showMessage('Bot iniciado com sucesso!', 'success');
+                        this.fetchBotLogs(); // Refresh logs after start
+                    })
+                    .catch(error => {
+                        console.error('Erro ao iniciar o bot:', error);
+                        this.showMessage(`Erro ao iniciar o bot: ${error.message}`, 'error');
+                        this.fetchBotStatus(); // Re-fetch status on error
+                    });
+                },
+
+                stopBot() {
+                    if (!confirm('Tem certeza que deseja parar o bot WhatsApp?')) return;
+                    this.botStatus = 'loading';
+                    this.message = null;
+                    const token = localStorage.getItem('zynapse_token');
+                    if (!token) { this.showMessage('Não autorizado.', 'error'); this.botStatus = 'error'; return; }
+
+                    fetch('/api/v1/bot/stop', { 
+                        method: 'POST', 
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    .then(response => {
+                         if (!response.ok) {
+                             return response.json().then(err => { throw new Error(err.detail || 'Falha ao parar o bot'); });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        this.botStatus = data.status;
+                        this.botPid = data.pid;
+                        this.showMessage('Bot parado com sucesso!', 'success');
+                        this.fetchBotLogs(); // Refresh logs after stop
+                    })
+                    .catch(error => {
+                        console.error('Erro ao parar o bot:', error);
+                        this.showMessage(`Erro ao parar o bot: ${error.message}`, 'error');
+                        this.fetchBotStatus(); // Re-fetch status on error
+                    });
+                },
+
+                fetchBotLogs() {
+                    this.logLoading = true;
+                    const token = localStorage.getItem('zynapse_token');
+                    if (!token) { this.showMessage('Não autorizado.', 'error'); this.logLoading = false; return; }
+
+                    fetch('/api/v1/bot/logs?lines=100', { headers: { 'Authorization': `Bearer ${token}` } })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Falha ao buscar logs');
+                        return response.text(); // Get logs as plain text
+                    })
+                    .then(data => {
+                        this.botLogs = data || 'Nenhum log disponível.';
+                        this.logLoading = false;
+                        // Scroll logs to bottom
+                        this.$nextTick(() => {
+                            const logContainer = this.$el.querySelector('.logs-container pre');
+                            if (logContainer) {
+                                logContainer.scrollTop = logContainer.scrollHeight;
+                            }
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar logs do bot:', error);
+                        this.showMessage('Erro ao buscar logs do bot.', 'error');
+                        this.botLogs = 'Erro ao carregar logs.';
+                        this.logLoading = false;
+                    });
+                }
+            }));
+        });
+    </script>
+</body>
+</html>
